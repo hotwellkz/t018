@@ -411,9 +411,23 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
 
     if (!fs.existsSync(job.localPath)) {
       console.error(`[VideoJob] [Approve] File not found for approval (job ${id}): ${job.localPath}`);
+      console.error(`[VideoJob] [Approve] DOWNLOAD_DIR env: ${process.env.DOWNLOAD_DIR || 'not set'}`);
+      console.error(`[VideoJob] [Approve] Current working directory: ${process.cwd()}`);
+      console.error(`[VideoJob] [Approve] File path resolved: ${path.resolve(job.localPath)}`);
+      
+      // Проверяем, существует ли директория
+      const dirPath = path.dirname(job.localPath);
+      console.error(`[VideoJob] [Approve] Directory exists: ${fs.existsSync(dirPath)}, path: ${dirPath}`);
+      if (fs.existsSync(dirPath)) {
+        const files = fs.readdirSync(dirPath);
+        console.error(`[VideoJob] [Approve] Files in directory: ${files.join(', ')}`);
+      }
+      
       return res.status(404).json({
         error: "Файл видео не найден",
         path: job.localPath,
+        resolvedPath: path.resolve(job.localPath),
+        downloadDir: process.env.DOWNLOAD_DIR || './downloads',
       });
     }
 

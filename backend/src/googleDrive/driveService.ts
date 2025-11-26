@@ -108,14 +108,52 @@ export async function uploadFileToDrive(
       webContentLink: res.data.webContentLink || undefined,
     };
   } catch (error: unknown) {
-    const err = error as { response?: { status?: number; data?: unknown }; message?: string };
+    const err = error as { 
+      response?: { 
+        status?: number; 
+        data?: unknown;
+        statusText?: string;
+      }; 
+      message?: string;
+      code?: string;
+      errors?: Array<{ message?: string; domain?: string; reason?: string }>;
+    };
     
-    console.error("[Drive] Upload error status:", err.response?.status);
-    console.error("[Drive] Upload error data:", JSON.stringify(err.response?.data, null, 2));
-    console.error("[Drive] Used folderId:", targetFolderId);
+    console.error("[Drive] ========== UPLOAD ERROR ==========");
+    console.error("[Drive] Error status:", err.response?.status);
+    console.error("[Drive] Error statusText:", err.response?.statusText);
+    console.error("[Drive] Error code:", err.code);
     console.error("[Drive] Error message:", err.message || String(error));
+    console.error("[Drive] Error data:", JSON.stringify(err.response?.data, null, 2));
+    console.error("[Drive] Error errors array:", JSON.stringify(err.errors, null, 2));
+    console.error("[Drive] Used folderId:", targetFolderId);
+    console.error("[Drive] File path:", localPath);
+    console.error("[Drive] File exists:", fs.existsSync(localPath));
+    if (fs.existsSync(localPath)) {
+      const stats = fs.statSync(localPath);
+      console.error("[Drive] File size:", stats.size, "bytes");
+    }
+    console.error("[Drive] ==================================");
 
-    throw error;
+    // Формируем более информативное сообщение об ошибке
+    let errorMessage = err.message || "Неизвестная ошибка при загрузке в Google Drive";
+    
+    if (err.response?.status === 401) {
+      errorMessage = "Ошибка авторизации Google Drive. Проверьте GDRIVE_REFRESH_TOKEN";
+    } else if (err.response?.status === 403) {
+      errorMessage = "Нет доступа к папке Google Drive. Проверьте права доступа и GDRIVE_FOLDER_ID";
+    } else if (err.response?.status === 404) {
+      errorMessage = "Папка Google Drive не найдена. Проверьте GDRIVE_FOLDER_ID";
+    } else if (err.errors && err.errors.length > 0) {
+      errorMessage = err.errors.map(e => e.message || e.reason || "Ошибка").join("; ");
+    }
+    
+    const enhancedError = new Error(errorMessage);
+    (enhancedError as any).originalError = error;
+    (enhancedError as any).status = err.response?.status;
+    (enhancedError as any).code = err.code;
+    
+    throw enhancedError;
   }
 }
 
