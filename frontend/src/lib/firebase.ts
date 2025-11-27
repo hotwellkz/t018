@@ -3,6 +3,9 @@ import { getAuth, Auth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
 import { getMessaging, getToken, onMessage, Messaging, isSupported } from 'firebase/messaging'
 import { apiFetch } from './apiClient'
 
+// Экспортируем тип User для использования в других модулях
+export type { User } from 'firebase/auth'
+
 // Конфигурация Firebase из переменных окружения
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
