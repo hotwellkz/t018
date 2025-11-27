@@ -91,7 +91,17 @@ function enrichDriveError(
 
   let errorMessage = err.message || "Неизвестная ошибка при загрузке в Google Drive";
 
-  if (err.response?.status === 401) {
+  if (err.response?.status === 400) {
+    // Ошибка 400 может означать разные проблемы
+    const errorDetails = err.errors?.[0];
+    if (errorDetails?.reason === "invalid") {
+      errorMessage = `Неверный запрос к Google Drive API: ${errorDetails.message || "Проверьте folder ID и параметры загрузки"}`;
+    } else if (errorDetails?.message) {
+      errorMessage = `Ошибка Google Drive: ${errorDetails.message}`;
+    } else {
+      errorMessage = "Ошибка запроса к Google Drive API. Проверьте параметры загрузки и folder ID";
+    }
+  } else if (err.response?.status === 401) {
     errorMessage = "Ошибка авторизации Google Drive. Проверьте GDRIVE_REFRESH_TOKEN";
   } else if (err.response?.status === 403) {
     errorMessage = "Нет доступа к папке Google Drive. Проверьте права доступа и GDRIVE_FOLDER_ID";
@@ -185,14 +195,36 @@ export async function uploadFileToDrive(
 
   console.log("[Drive] Uploading to folder:", targetFolderId, "file:", finalFileName);
   console.log("[Drive] Local file path:", localPath);
+  console.log("[Drive] Current working directory:", process.cwd());
+  console.log("[Drive] Resolved file path:", path.resolve(localPath));
 
   // Проверяем, что файл существует
   if (!fs.existsSync(localPath)) {
-    throw new Error(`Файл не найден: ${localPath}`);
+    const resolvedPath = path.resolve(localPath);
+    const dirPath = path.dirname(localPath);
+    const dirExists = fs.existsSync(dirPath);
+    console.error("[Drive] ========== FILE NOT FOUND ==========");
+    console.error("[Drive] File path:", localPath);
+    console.error("[Drive] Resolved path:", resolvedPath);
+    console.error("[Drive] Directory exists:", dirExists);
+    if (dirExists) {
+      try {
+        const files = fs.readdirSync(dirPath);
+        console.error("[Drive] Files in directory:", files.slice(0, 10).join(", "), files.length > 10 ? `... (${files.length} total)` : "");
+      } catch (dirError: any) {
+        console.error("[Drive] Error reading directory:", dirError.message);
+      }
+    }
+    console.error("[Drive] ====================================");
+    throw new Error(`Файл не найден: ${localPath}. Возможно, файл был удалён или контейнер Cloud Run был перезапущен.`);
   }
 
   const fileStats = fs.statSync(localPath);
   console.log("[Drive] File size:", fileStats.size, "bytes");
+  
+  if (fileStats.size === 0) {
+    throw new Error(`Файл пустой (0 bytes): ${localPath}`);
+  }
 
   const { maxRetries, retryDelay } = resolveRetryConfig();
   const mimeType = "video/mp4";
