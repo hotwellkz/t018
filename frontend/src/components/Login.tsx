@@ -18,14 +18,25 @@ export default function Login() {
       toast.success('Успешный вход!')
     } catch (error: any) {
       console.error('Ошибка входа:', error)
-      const errorMessage =
-        error.code === 'auth/user-not-found'
-          ? 'Пользователь не найден'
-          : error.code === 'auth/wrong-password'
-          ? 'Неверный пароль'
-          : error.code === 'auth/invalid-email'
-          ? 'Неверный email'
-          : error.message || 'Ошибка входа'
+      console.error('Error code:', error.code)
+      console.error('Error message:', error.message)
+      
+      let errorMessage = 'Ошибка входа'
+      
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'Пользователь не найден. Обратитесь к администратору.'
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Неверный пароль'
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Неверный email'
+      } else if (error.code === 'auth/invalid-credential') {
+        errorMessage = 'Неверный email или пароль. Проверьте правильность введённых данных.'
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorMessage = 'Вход по email/паролю не разрешён. Обратитесь к администратору.'
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
       toast.error(errorMessage)
     } finally {
       setLoading(false)

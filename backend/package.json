@@ -11,7 +11,9 @@
     "get-drive-token": "ts-node tools/getDriveRefreshToken.ts",
     "migrate-channels": "ts-node tools/migrateChannels.ts",
     "migrate-user-data": "ts-node tools/migrateUserData.ts",
-    "setup-firebase-env": "ts-node tools/setupFirebaseEnv.ts"
+    "setup-firebase-env": "ts-node tools/setupFirebaseEnv.ts",
+    "create-firebase-user": "ts-node tools/createFirebaseUser.ts",
+    "check-firebase-user": "ts-node tools/checkFirebaseUser.ts"
   },
   "dependencies": {
     "@types/multer": "^2.0.0",
