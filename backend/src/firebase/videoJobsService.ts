@@ -12,6 +12,7 @@ export async function createJob(job: VideoJob): Promise<VideoJob> {
     const jobRef = db.collection(COLLECTION_NAME).doc(job.id);
     
     await jobRef.set({
+      userId: job.userId,
       prompt: job.prompt,
       channelId: job.channelId || null,
       channelName: job.channelName || null,
@@ -60,6 +61,10 @@ export async function getJob(id: string): Promise<VideoJob | undefined> {
       ...doc.data(),
     } as VideoJob;
     job.jobId = job.jobId || doc.id;
+    // Поддержка старых данных без userId
+    if (!job.userId) {
+      job.userId = "";
+    }
     return job;
   } catch (error: unknown) {
     console.error(`[Firebase] Error getting job ${id}:`, error);
@@ -173,12 +178,16 @@ export async function deleteJobCascade(id: string): Promise<boolean> {
 }
 
 /**
- * Получить все задачи, опционально отфильтрованные по channelId
+ * Получить все задачи, опционально отфильтрованные по channelId и userId
  */
-export async function getAllJobs(channelId?: string): Promise<VideoJob[]> {
+export async function getAllJobs(channelId?: string, userId?: string): Promise<VideoJob[]> {
   try {
     const db = getFirestore();
     let query: FirebaseFirestore.Query = db.collection(COLLECTION_NAME);
+    
+    if (userId) {
+      query = query.where("userId", "==", userId);
+    }
     
     if (channelId) {
       query = query.where("channelId", "==", channelId);
@@ -193,6 +202,10 @@ export async function getAllJobs(channelId?: string): Promise<VideoJob[]> {
         ...doc.data(),
       } as VideoJob;
       job.jobId = job.jobId || doc.id;
+      // Поддержка старых данных без userId
+      if (!job.userId) {
+        job.userId = "";
+      }
       jobs.push(job);
     });
 
@@ -207,9 +220,9 @@ export async function getAllJobs(channelId?: string): Promise<VideoJob[]> {
  * Получить активные задачи (в процессе генерации)
  * Исключает задачи, которые зависли слишком долго (более 2 часов без обновления)
  */
-export async function getActiveJobs(channelId?: string): Promise<VideoJob[]> {
+export async function getActiveJobs(channelId?: string, userId?: string): Promise<VideoJob[]> {
   const activeStatuses: VideoJobStatus[] = ["queued", "sending", "waiting_video", "downloading", "uploading"];
-  const jobs = await getAllJobs(channelId);
+  const jobs = await getAllJobs(channelId, userId);
   const now = Date.now();
   const MAX_ACTIVE_AGE_MS = 2 * 60 * 60 * 1000; // 2 часа
   
@@ -237,8 +250,8 @@ export async function getActiveJobs(channelId?: string): Promise<VideoJob[]> {
 /**
  * Подсчитать количество активных задач
  */
-export async function countActiveJobs(channelId?: string): Promise<number> {
-  const activeJobs = await getActiveJobs(channelId);
+export async function countActiveJobs(channelId?: string, userId?: string): Promise<number> {
+  const activeJobs = await getActiveJobs(channelId, userId);
   return activeJobs.length;
 }
 

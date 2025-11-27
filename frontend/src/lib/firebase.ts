@@ -1,4 +1,5 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app'
+import { getAuth, Auth, signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth'
 import { getMessaging, getToken, onMessage, Messaging, isSupported } from 'firebase/messaging'
 import { apiFetch } from './apiClient'
 
@@ -14,6 +15,7 @@ const firebaseConfig = {
 }
 
 let app: FirebaseApp | null = null
+let auth: Auth | null = null
 let messaging: Messaging | null = null
 
 /**
@@ -38,11 +40,74 @@ export function initFirebase(): FirebaseApp | null {
       app = initializeApp(firebaseConfig)
       console.log('[Firebase] ✅ Firebase инициализирован')
     }
+    
+    // Инициализируем Auth
+    if (app && !auth) {
+      auth = getAuth(app)
+      console.log('[Firebase] ✅ Firebase Auth инициализирован')
+    }
+    
     return app
   } catch (error) {
     console.error('[Firebase] ❌ Ошибка инициализации Firebase:', error)
     return null
   }
+}
+
+/**
+ * Получить экземпляр Auth
+ */
+export function getAuthInstance(): Auth | null {
+  if (!app) {
+    initFirebase()
+  }
+  return auth
+}
+
+/**
+ * Войти с email и паролем
+ */
+export async function signIn(email: string, password: string): Promise<User> {
+  const authInstance = getAuthInstance()
+  if (!authInstance) {
+    throw new Error('Firebase Auth не инициализирован')
+  }
+  const userCredential = await signInWithEmailAndPassword(authInstance, email, password)
+  return userCredential.user
+}
+
+/**
+ * Выйти
+ */
+export async function signOutUser(): Promise<void> {
+  const authInstance = getAuthInstance()
+  if (!authInstance) {
+    throw new Error('Firebase Auth не инициализирован')
+  }
+  await signOut(authInstance)
+}
+
+/**
+ * Подписаться на изменения состояния авторизации
+ */
+export function onAuthStateChange(callback: (user: User | null) => void): () => void {
+  const authInstance = getAuthInstance()
+  if (!authInstance) {
+    callback(null)
+    return () => {}
+  }
+  return onAuthStateChanged(authInstance, callback)
+}
+
+/**
+ * Получить текущего пользователя
+ */
+export function getCurrentUser(): User | null {
+  const authInstance = getAuthInstance()
+  if (!authInstance) {
+    return null
+  }
+  return authInstance.currentUser
 }
 
 /**

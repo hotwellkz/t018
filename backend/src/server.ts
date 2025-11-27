@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import * as dotenv from "dotenv";
+import authRouter from "./api/auth";
 import channelsRouter from "./api/channels";
 import ideasRouter from "./api/ideas";
 import promptsRouter from "./api/prompts";
@@ -63,6 +64,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // API Routes
+app.use("/api/auth", authRouter);
 app.use("/api/channels", channelsRouter);
 app.use("/api/ideas", ideasRouter);
 app.use("/api/prompts", promptsRouter);

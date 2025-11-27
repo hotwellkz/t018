@@ -10,8 +10,12 @@ import {
   deleteJob,
 } from "../models/videoJob";
 import { getSafeFileName } from "../utils/fileNameSanitizer";
+import { verifyToken } from "../middleware/auth";
 
 const router = Router();
+
+// Все роуты требуют авторизации
+router.use(verifyToken);
 
 // POST /api/video/generate
 router.post("/generate", async (req: Request, res: Response) => {
@@ -22,8 +26,12 @@ router.post("/generate", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Требуется veoprompt" });
     }
 
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     // Создаём job с videoTitle
-    const job = await createJob(veoprompt, channelId, ideaText, videoTitle);
+    const job = await createJob(veoprompt, req.user.uid, channelId, undefined, ideaText, videoTitle);
     console.log(`[VideoJob] Created job ${job.id}, videoTitle: ${videoTitle || "не указано"}`);
 
     try {
@@ -87,8 +95,21 @@ router.post("/generate", async (req: Request, res: Response) => {
 // GET /api/video/preview/:id
 router.get("/preview/:id", async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     const { id } = req.params;
     const job = await getJob(id);
+
+    if (!job) {
+      return res.status(404).json({ error: "Job не найден" });
+    }
+
+    // Проверяем, что job принадлежит пользователю
+    if (job.userId !== req.user.uid) {
+      return res.status(403).json({ error: "Нет доступа к этому видео" });
+    }
 
     if (!job) {
       return res.status(404).json({ error: "Job не найден" });
@@ -129,12 +150,21 @@ router.get("/preview/:id", async (req: Request, res: Response) => {
 // POST /api/video/jobs/:id/approve
 router.post("/jobs/:id/approve", async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     const { id } = req.params;
     const { videoTitle } = req.body; // Принимаем обновлённое название из запроса
     const job = await getJob(id);
 
     if (!job) {
       return res.status(404).json({ error: "Job не найден" });
+    }
+
+    // Проверяем, что job принадлежит пользователю
+    if (job.userId !== req.user.uid) {
+      return res.status(403).json({ error: "Нет доступа к этому видео" });
     }
 
     if (job.status !== "ready") {
@@ -205,21 +235,40 @@ router.post("/jobs/:id/approve", async (req: Request, res: Response) => {
     }
   } catch (error: any) {
     console.error("Ошибка при одобрении видео:", error);
-    res.status(500).json({
+    const payload = {
       error: "Ошибка при загрузке в Google Drive",
-      message: error.message,
-    });
+      message: error?.message || "Неизвестная ошибка",
+      googleDriveStatus: error?.status,
+      googleDriveCode: error?.code,
+      details:
+        process.env.NODE_ENV === "development"
+          ? {
+              stack: error?.stack,
+              response: error?.response?.data || error?.originalError?.response?.data,
+            }
+          : undefined,
+    };
+    res.status(500).json(payload);
   }
 });
 
 // POST /api/video/jobs/:id/reject
 router.post("/jobs/:id/reject", async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     const { id } = req.params;
     const job = await getJob(id);
 
     if (!job) {
       return res.status(404).json({ error: "Job не найден" });
+    }
+
+    // Проверяем, что job принадлежит пользователю
+    if (job.userId !== req.user.uid) {
+      return res.status(403).json({ error: "Нет доступа к этому видео" });
     }
 
     // Удаляем локальный файл
@@ -244,11 +293,20 @@ router.post("/jobs/:id/reject", async (req: Request, res: Response) => {
 // POST /api/video/jobs/:id/regenerate
 router.post("/jobs/:id/regenerate", async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     const { id } = req.params;
     const oldJob = await getJob(id);
 
     if (!oldJob) {
       return res.status(404).json({ error: "Job не найден" });
+    }
+
+    // Проверяем, что job принадлежит пользователю
+    if (oldJob.userId !== req.user.uid) {
+      return res.status(403).json({ error: "Нет доступа к этому видео" });
     }
 
     // Можно использовать обновлённый промпт из body или старый
@@ -257,7 +315,9 @@ router.post("/jobs/:id/regenerate", async (req: Request, res: Response) => {
     // Создаём новый job с сохранением videoTitle
     const newJob = await createJob(
       veoprompt,
+      req.user.uid,
       oldJob.channelId,
+      oldJob.channelName,
       oldJob.ideaText,
       oldJob.videoTitle
     );

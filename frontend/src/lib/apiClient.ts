@@ -77,13 +77,42 @@ async function fetchWithRetry(
   throw lastError
 }
 
+/**
+ * Получить ID токен для авторизации
+ */
+async function getIdToken(): Promise<string | null> {
+  try {
+    const { getCurrentUser } = await import('./firebase')
+    const user = getCurrentUser()
+    if (!user) {
+      return null
+    }
+    return await user.getIdToken()
+  } catch (error) {
+    console.error('[apiClient] Ошибка получения токена:', error)
+    return null
+  }
+}
+
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const targetUrl = resolveApiUrl(path)
+
+  // Добавляем токен авторизации, если он есть
+  const headers = new Headers(options.headers)
+  const token = await getIdToken()
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  const optionsWithAuth = {
+    ...options,
+    headers,
+  }
 
   let response: Response
   try {
     // Используем retry механизм для сетевых и серверных ошибок
-    response = await fetchWithRetry(targetUrl, options)
+    response = await fetchWithRetry(targetUrl, optionsWithAuth)
   } catch (error) {
     // Логируем детали ошибки для диагностики
     const errorDetails: any = {

@@ -14,9 +14,13 @@ import {
 } from "../models/videoJob";
 import { getChannelById } from "../models/channel";
 import { getSafeFileName } from "../utils/fileNameSanitizer";
+import { verifyToken } from "../middleware/auth";
 import * as admin from "firebase-admin";
 
 const router = Router();
+
+// Все роуты требуют авторизации
+router.use(verifyToken);
 
 const MAX_ACTIVE_JOBS = 2;
 
@@ -249,8 +253,12 @@ router.post("/", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Требуется поле prompt (непустая строка)" });
     }
 
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     // Проверяем лимит активных задач
-    const activeCount = await countActiveJobs(channelId);
+    const activeCount = await countActiveJobs(channelId, req.user.uid);
     if (activeCount >= MAX_ACTIVE_JOBS) {
       return res.status(429).json({
         error: "MAX_ACTIVE_JOBS_REACHED",
@@ -263,6 +271,7 @@ router.post("/", async (req: Request, res: Response) => {
     // Создаём задачу
     const job = await createJob(
       prompt.trim(),
+      req.user.uid,
       channelId,
       channelName,
       ideaText,
@@ -298,10 +307,14 @@ router.post("/", async (req: Request, res: Response) => {
  */
 router.get("/", async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     const { channelId } = req.query;
     const channelIdStr = channelId ? String(channelId) : undefined;
 
-    const jobs = await getAllJobs(channelIdStr);
+    const jobs = await getAllJobs(channelIdStr, req.user.uid);
     
     // Сортируем по createdAt (новые сверху) и ограничиваем последними 20
     const sortedJobs = jobs
@@ -327,7 +340,7 @@ router.get("/", async (req: Request, res: Response) => {
 
     res.json({
       jobs: sortedJobs,
-      activeCount: await countActiveJobs(channelIdStr),
+      activeCount: await countActiveJobs(channelIdStr, req.user.uid),
       maxActiveJobs: MAX_ACTIVE_JOBS,
     });
   } catch (error: any) {
@@ -346,11 +359,20 @@ router.get("/", async (req: Request, res: Response) => {
  */
 router.get("/:id/preview", async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     const { id } = req.params;
     const job = await getJob(id);
 
     if (!job) {
       return res.status(404).json({ error: "Job не найден" });
+    }
+
+    // Проверяем, что job принадлежит пользователю
+    if (job.userId !== req.user.uid) {
+      return res.status(403).json({ error: "Нет доступа к этому видео" });
     }
 
     if (job.status !== "ready" && job.status !== "uploaded") {
@@ -383,6 +405,10 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
   console.log(`[VideoJob] [Approve] Starting approval for job: ${id}`);
   
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     const { videoTitle } = req.body;
     console.log(`[VideoJob] [Approve] Request body videoTitle:`, videoTitle);
     
@@ -393,6 +419,11 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
     if (!job) {
       console.error(`[VideoJob] [Approve] Job ${id} not found`);
       return res.status(404).json({ error: "Job не найден" });
+    }
+
+    // Проверяем, что job принадлежит пользователю
+    if (job.userId !== req.user.uid) {
+      return res.status(403).json({ error: "Нет доступа к этому видео" });
     }
 
     console.log(`[VideoJob] [Approve] Job found: status=${job.status}, channelId=${job.channelId}, localPath=${job.localPath}`);
@@ -542,14 +573,21 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
     console.error(`[VideoJob] [Approve] Error stack:`, error?.stack);
     console.error(`[VideoJob] [Approve] Error response data:`, error?.response?.data);
     
-    res.status(500).json({
+    const payload = {
       error: "Ошибка при загрузке в Google Drive",
       message: error?.message || "Неизвестная ошибка",
-      details: process.env.NODE_ENV === 'development' ? {
-        stack: error?.stack,
-        response: error?.response?.data,
-      } : undefined,
-    });
+      googleDriveStatus: error?.status,
+      googleDriveCode: error?.code,
+      details:
+        process.env.NODE_ENV === "development"
+          ? {
+              stack: error?.stack,
+              response: error?.response?.data || error?.originalError?.response?.data,
+            }
+          : undefined,
+    };
+
+    res.status(500).json(payload);
   }
 });
 
@@ -562,6 +600,10 @@ router.post("/:id/reject", async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     console.log(`[VideoJob] Reject request received for job ${id}`);
 
     const job = await getJob(id);
@@ -572,6 +614,11 @@ router.post("/:id/reject", async (req: Request, res: Response) => {
         error: "Job не найден",
         jobId: id,
       });
+    }
+
+    // Проверяем, что job принадлежит пользователю
+    if (job.userId !== req.user.uid) {
+      return res.status(403).json({ error: "Нет доступа к этому видео" });
     }
 
     console.log(
@@ -638,6 +685,10 @@ router.delete("/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     console.log(`[VideoJob] Delete request received for job ${id}`);
 
     const job = await getJob(id);
@@ -648,6 +699,11 @@ router.delete("/:id", async (req: Request, res: Response) => {
         success: false,
         message: "Video job not found",
       });
+    }
+
+    // Проверяем, что job принадлежит пользователю
+    if (job.userId !== req.user.uid) {
+      return res.status(403).json({ error: "Нет доступа к этому видео" });
     }
 
     // Удаляем локальные файлы

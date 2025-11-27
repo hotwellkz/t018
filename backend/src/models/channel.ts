@@ -24,6 +24,7 @@ export interface ChannelAutomation {
 
 export interface Channel {
   id: string;
+  userId: string; // ID пользователя-владельца канала
   name: string;
   description: string; // Краткое описание стиля канала
   language: Language; // Основной язык ролика

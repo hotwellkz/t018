@@ -7,8 +7,12 @@ import {
   deleteChannel,
   Channel,
 } from "../models/channel";
+import { verifyToken } from "../middleware/auth";
 
 const router = Router();
+
+// Все роуты требуют авторизации
+router.use(verifyToken);
 
 // GET /api/channels
 router.get("/", async (req: Request, res: Response) => {
@@ -24,8 +28,12 @@ router.get("/", async (req: Request, res: Response) => {
   }, 30000);
 
   try {
-    console.log("[API] GET /api/channels - запрос получен");
-    const channels = await getAllChannels();
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
+    console.log("[API] GET /api/channels - запрос получен для пользователя:", req.user.uid);
+    const channels = await getAllChannels(req.user.uid);
     console.log(`[API] GET /api/channels - получено ${channels.length} каналов`);
     
     // Отменяем таймаут, если запрос успешно выполнен
@@ -157,8 +165,13 @@ router.post("/", async (req: Request, res: Response) => {
       cleanedAutomation.runId = null;
     }
 
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     const channel = await createChannel({
       id,
+      userId: req.user.uid,
       name,
       description: description || "",
       language: language || "ru",
@@ -301,6 +314,19 @@ router.put("/:id", async (req: Request, res: Response) => {
       updateData.automation = cleanedAutomation;
     }
 
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
+    // Проверяем, что канал принадлежит пользователю
+    const existingChannel = await getChannelById(id);
+    if (!existingChannel) {
+      return res.status(404).json({ error: "Канал не найден" });
+    }
+    if (existingChannel.userId !== req.user.uid) {
+      return res.status(403).json({ error: "Нет доступа к этому каналу" });
+    }
+
     const updated = await updateChannel(id, updateData);
 
     if (!updated) {
@@ -332,7 +358,21 @@ router.put("/:id", async (req: Request, res: Response) => {
 // DELETE /api/channels/:id
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Пользователь не авторизован" });
+    }
+
     const { id } = req.params;
+    
+    // Проверяем, что канал принадлежит пользователю
+    const existingChannel = await getChannelById(id);
+    if (!existingChannel) {
+      return res.status(404).json({ error: "Канал не найден" });
+    }
+    if (existingChannel.userId !== req.user.uid) {
+      return res.status(403).json({ error: "Нет доступа к этому каналу" });
+    }
+
     const deleted = await deleteChannel(id);
 
     if (!deleted) {

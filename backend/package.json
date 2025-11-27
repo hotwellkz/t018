@@ -9,7 +9,9 @@
     "start": "node dist/server.js",
     "test-drive": "ts-node src/test-drive-upload.ts",
     "get-drive-token": "ts-node tools/getDriveRefreshToken.ts",
-    "migrate-channels": "ts-node tools/migrateChannels.ts"
+    "migrate-channels": "ts-node tools/migrateChannels.ts",
+    "migrate-user-data": "ts-node tools/migrateUserData.ts",
+    "setup-firebase-env": "ts-node tools/setupFirebaseEnv.ts"
   },
   "dependencies": {
     "@types/multer": "^2.0.0",

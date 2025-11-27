@@ -6,10 +6,17 @@ const COLLECTION_NAME = "channels";
 /**
  * Получить все каналы из Firestore
  */
-export async function getAllChannels(): Promise<Channel[]> {
+export async function getAllChannels(userId?: string): Promise<Channel[]> {
   try {
     const db = getFirestore();
-    const snapshot = await db.collection(COLLECTION_NAME).get();
+    let query: FirebaseFirestore.Query = db.collection(COLLECTION_NAME);
+    
+    // Фильтруем по userId, если указан
+    if (userId) {
+      query = query.where("userId", "==", userId);
+    }
+    
+    const snapshot = await query.get();
     
     const channels: Channel[] = [];
     snapshot.forEach((doc) => {
@@ -26,6 +33,7 @@ export async function getAllChannels(): Promise<Channel[]> {
       
       const channel: Channel = {
         id: doc.id,
+        userId: data.userId || "", // Поддержка старых данных без userId
         name: data.name || "",
         description: data.description || "",
         language: data.language || "ru",
@@ -94,10 +102,17 @@ export async function getChannelById(id: string): Promise<Channel | undefined> {
       }
     }
 
-    return {
+    const channelData = {
       id: doc.id,
       ...data,
     } as Channel;
+    
+    // Поддержка старых данных без userId
+    if (!channelData.userId) {
+      channelData.userId = "";
+    }
+    
+    return channelData;
   } catch (error: unknown) {
     console.error(`[Firebase] Error getting channel ${id}:`, error);
     throw new Error(`Ошибка получения канала: ${error instanceof Error ? error.message : String(error)}`);
@@ -113,6 +128,7 @@ export async function createChannel(channel: Channel): Promise<Channel> {
     const channelRef = db.collection(COLLECTION_NAME).doc(channel.id);
     
     await channelRef.set({
+      userId: channel.userId,
       name: channel.name,
       description: channel.description,
       language: channel.language,

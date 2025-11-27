@@ -7,18 +7,31 @@ import ChannelSettings from './components/ChannelSettings'
 import VideoJobsHistory from './pages/VideoJobsHistory'
 import AutomationDebug from './pages/AutomationDebug'
 import ToastContainer from './components/ToastContainer'
+import Login from './components/Login'
 import { useToast } from './hooks/useToast'
 import { useWizard } from './contexts/WizardContext'
+import { useAuth } from './contexts/AuthContext'
+import { signOutUser } from './lib/firebase'
 import WizardSteps from './components/WizardSteps'
 import WizardStepsSticky from './components/WizardStepsSticky'
 
 function App() {
   const location = useLocation()
   const toast = useToast()
+  const { user, loading } = useAuth()
   const { step, setStep, selectedChannel, setSelectedChannel } = useWizard()
   const [isStickyVisible, setIsStickyVisible] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
   const mainContentRef = useRef<HTMLDivElement>(null)
+
+  const handleSignOut = async () => {
+    try {
+      await signOutUser()
+      toast.success('Вы вышли из аккаунта')
+    } catch (error: any) {
+      toast.error('Ошибка при выходе: ' + (error.message || 'Неизвестная ошибка'))
+    }
+  }
 
   const isActive = (path: string) => location.pathname === path
   const isVideoGenerationPage = location.pathname === '/'
@@ -54,10 +67,49 @@ function App() {
     }
   }
 
+  // Показываем форму входа, если пользователь не авторизован
+  if (loading) {
+    return (
+      <div className="app">
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+          <p>Загрузка...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="app">
+        <Login />
+        <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
+      </div>
+    )
+  }
+
   return (
     <div className="app">
       <header ref={headerRef} className="app-header">
-        <h1>shortai.ru</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <h1>shortai.ru</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span style={{ fontSize: '14px', color: '#666' }}>{user.email}</span>
+            <button
+              onClick={handleSignOut}
+              style={{
+                padding: '8px 16px',
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              Выйти
+            </button>
+          </div>
+        </div>
         <nav className="tabs">
           <Link
             to="/"

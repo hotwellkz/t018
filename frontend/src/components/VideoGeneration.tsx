@@ -1019,8 +1019,22 @@ const VideoGeneration: React.FC = () => {
       await fetchVideoJobs()
     } catch (err: any) {
       console.error('[Approve] Error approving job:', err)
-      toast.error(err.message || 'Ошибка при одобрении видео')
-      setError(err.message)
+
+      let friendlyMessage = err?.message || 'Ошибка при одобрении видео'
+      if (err instanceof ApiError && err.body && typeof err.body === 'object') {
+        const body = err.body as Record<string, any>
+        friendlyMessage = (body.message as string) || friendlyMessage
+
+        if (body.googleDriveStatus) {
+          console.warn('[Approve] Google Drive diagnostics:', {
+            status: body.googleDriveStatus,
+            code: body.googleDriveCode,
+          })
+        }
+      }
+
+      toast.error(friendlyMessage)
+      setError(friendlyMessage)
     } finally {
       setApprovingJobId(null)
     }

@@ -22,6 +22,7 @@ export interface VideoJobDebugLogs {
 
 export interface VideoJob {
   id: string;
+  userId: string; // ID пользователя-владельца задачи
   jobId: string;
   prompt: string;
   channelId?: string;
@@ -75,6 +76,7 @@ import {
  */
 export async function createJob(
   prompt: string,
+  userId: string,
   channelId?: string,
   channelName?: string,
   ideaText?: string,
@@ -84,6 +86,7 @@ export async function createJob(
   const id = generateJobId();
   const job: VideoJob = {
     id,
+    userId,
     jobId: id,
     prompt,
     channelId,

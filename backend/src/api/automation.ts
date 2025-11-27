@@ -458,8 +458,15 @@ export async function createAutomatedJob(
         });
       }
 
+      // userId должен быть в канале
+      if (!channel.userId) {
+        logger?.error("Channel has no userId, cannot create job")
+        throw new Error(`Канал ${channel.id} не имеет userId`)
+      }
+
       job = await createJob(
         ideaAndPromptResult.veoPrompt,
+        channel.userId,
         channel.id,
         channel.name,
         ideaAndPromptResult.ideaText,
