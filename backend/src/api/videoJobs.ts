@@ -556,7 +556,21 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
         stack: error?.stack,
         response: error?.response?.data,
         status: error?.response?.status,
+        originalError: error?.originalError,
       });
+      
+      // Проверяем, существует ли файл
+      if (job.localPath) {
+        const fileExists = fs.existsSync(job.localPath);
+        console.error(`[VideoJob] [Approve] File exists check: ${fileExists}, path: ${job.localPath}`);
+        if (fileExists) {
+          const fileStat = fs.statSync(job.localPath);
+          console.error(`[VideoJob] [Approve] File size: ${fileStat.size} bytes`);
+        } else {
+          console.error(`[VideoJob] [Approve] ⚠️  ФАЙЛ НЕ НАЙДЕН НА СЕРВЕРЕ!`);
+          console.error(`[VideoJob] [Approve] Это может быть проблемой Cloud Run - файлы хранятся во временной файловой системе`);
+        }
+      }
       
       // Откатываем статус
       try {
