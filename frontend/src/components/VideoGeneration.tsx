@@ -191,7 +191,6 @@ const VideoGeneration: React.FC = () => {
   const [generatingIdeas, setGeneratingIdeas] = useState(false)
   const [generatingPrompt, setGeneratingPrompt] = useState(false)
   const [generatingTitle, setGeneratingTitle] = useState(false)
-  const [generatingVideoFromIdea, setGeneratingVideoFromIdea] = useState<string | null>(null) // ID идеи, для которой идёт генерация
   // Состояния загрузки для каждой идеи отдельно
   const [isVideoLoading, setIsVideoLoading] = useState<Map<string, boolean>>(new Map()) // ID идеи -> true/false
   const [isPromptLoading, setIsPromptLoading] = useState<Map<string, boolean>>(new Map()) // ID идеи -> true/false
@@ -493,7 +492,7 @@ const VideoGeneration: React.FC = () => {
   }
 
   // Общая функция для генерации промпта из идеи
-  const generatePromptFromIdea = async (idea: Idea, channel: Channel): Promise<{ veoPrompt: string; videoTitle: string }> => {
+  const generatePromptFromIdea = async (idea: Idea, channel: { id: string }): Promise<{ veoPrompt: string; videoTitle: string }> => {
     const promptData = await apiFetchJson<{ veoPrompt: string; videoTitle: string }>('/api/prompts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
