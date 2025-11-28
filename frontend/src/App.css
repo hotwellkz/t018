@@ -3824,6 +3824,70 @@
   flex-wrap: wrap;
 }
 
+/* Стили для кнопок действий идеи */
+.idea-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.idea-action-button {
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.3s;
+  cursor: pointer;
+  border: none;
+}
+
+.idea-action-button--primary {
+  background: #667eea;
+  color: white;
+}
+
+.idea-action-button--primary:hover:not(:disabled) {
+  background: #5568d3;
+  transform: translateY(-1px);
+}
+
+.idea-action-button--primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.idea-action-button--secondary {
+  background: transparent;
+  border: 2px solid #e2e8f0;
+  color: #2d3748;
+}
+
+.idea-action-button--secondary:hover:not(:disabled) {
+  border-color: #667eea;
+  color: #667eea;
+  background: #f0f4ff;
+}
+
+.idea-action-button--secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* На десктопе кнопки можно расположить рядом */
+@media (min-width: 768px) {
+  .idea-actions {
+    flex-direction: row;
+    gap: 0.75rem;
+  }
+  
+  .idea-action-button {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 /* Новый компонент MobileActionsBar - липкое нижнее меню */
 .mobile-actions-bar {
   display: none; /* Скрыто по умолчанию, показывается только на мобильных */

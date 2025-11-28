@@ -47,3 +47,5 @@ VITE_FIREBASE_PROJECT_ID=bibi-b7ce9
 
 После включения Email/Password провайдера в Firebase Console может потребоваться несколько минут для применения изменений.
 
+
+
